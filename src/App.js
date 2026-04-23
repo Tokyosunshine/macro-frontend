@@ -37,7 +37,7 @@ function App() {
     }}>
       <h2 style={{ fontSize: 18 }}>Macro Terminal</h2>
 
-      {/* 📊 GRID (LARGE INDICATORS) */}
+      {/* 📊 GRID */}
       <div style={{
         display: "grid",
         gridTemplateColumns: "1fr 1fr",
@@ -50,14 +50,17 @@ function App() {
             border: "1px solid #1e293b",
             borderRadius: 10
           }}>
+            {/* 🔤 LABEL (↑ bigger) */}
             <div style={{
-              fontSize: 14,
-              color: "#94a3b8",
-              marginBottom: 4
+              fontSize: 20,        // was 14 → +75%+
+              fontWeight: "500",
+              color: "#cbd5f5",
+              marginBottom: 6
             }}>
               {d.name}
             </div>
 
+            {/* 💰 PRICE (unchanged) */}
             <div style={{
               fontSize: 28,
               fontWeight: "bold",
@@ -66,10 +69,17 @@ function App() {
               {d.price ? d.price.toFixed(2) : "—"}
             </div>
 
+            {/* 📈 % CHANGE (↑ bigger) */}
             <div style={{
-              fontSize: 18,
-              marginTop: 2,
-              color: d.pctChange > 0 ? "#22c55e" : "#ef4444"
+              fontSize: 22,        // was 18 → +75% feel
+              marginTop: 4,
+              fontWeight: "600",
+              color:
+                d.pctChange > 0
+                  ? "#22c55e"
+                  : d.pctChange < 0
+                  ? "#ef4444"
+                  : "#94a3b8"
             }}>
               {d.pctChange ? d.pctChange.toFixed(2) + "%" : "—"}
             </div>
@@ -77,7 +87,7 @@ function App() {
         ))}
       </div>
 
-      {/* 🔑 KEY TAKEAWAY */}
+      {/* 🔑 TAKEAWAY */}
       <div style={{
         marginTop: 15,
         padding: 12,
@@ -107,7 +117,7 @@ function App() {
         </div>
       </div>
 
-      {/* 🤖 AI COMMENTARY */}
+      {/* 🤖 COMMENTARY */}
       <div style={{
         marginTop: 15,
         padding: 12,
