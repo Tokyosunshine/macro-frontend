@@ -7,24 +7,27 @@ function App() {
   const [commentary, setCommentary] = useState("");
   const [confidence, setConfidence] = useState(null);
 
-  // 🧠 MEMORY (persist across refresh)
   const prevSignalRef = useRef(null);
   const smoothedScoreRef = useRef(0);
 
   const API_BASE = "https://macro-backend-cq9c.onrender.com";
 
   const fetchData = async () => {
-    const res = await fetch(`${API_BASE}/api/prices`);
-    const prices = await res.json();
-    setData(prices);
+    try {
+      const res = await fetch(`${API_BASE}/api/prices`);
+      const prices = await res.json();
+      setData(prices || []);
 
-    const expRes = await fetch(`${API_BASE}/api/explain`);
-    const exp = await expRes.json();
+      const expRes = await fetch(`${API_BASE}/api/explain`);
+      const exp = await expRes.json();
 
-    setTakeaway(exp.takeaway);
-    setAction(exp.action);
-    setCommentary(exp.commentary);
-    setConfidence(exp.confidence);
+      setTakeaway(exp?.takeaway || "");
+      setAction(exp?.action || "");
+      setCommentary(exp?.commentary || "");
+      setConfidence(exp?.confidence ?? null);
+    } catch (err) {
+      console.log("Fetch error:", err);
+    }
   };
 
   useEffect(() => {
@@ -33,9 +36,13 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // 🔥 HELPER
-  const get = (name) =>
-    data.find(d => d.name === name)?.pctChange || 0;
+  // 🔥 SAFE helper
+  const get = (name) => {
+    const found = data.find(d => d.name === name);
+    return found && typeof found.pctChange === "number"
+      ? found.pctChange
+      : 0;
+  };
 
   const usd = get("USD/CHF");
   const gold = get("Gold");
@@ -44,7 +51,7 @@ function App() {
   const btc = get("Bitcoin");
   const oil = get("Oil");
 
-  // 🔥 WEIGHTED SIGNAL
+  // 🔥 weighted signal
   let rawScore = 0;
   rawScore += usd > 0 ? -1.5 : 1.5;
   rawScore += gold > 0 ? -1 : 1;
@@ -53,27 +60,25 @@ function App() {
   rawScore += btc > 0 ? 1 : -1;
   rawScore += oil > 0 ? 0.5 : -0.5;
 
-  // 🧠 SMOOTHING (anti-noise)
+  // 🧠 smoothing
   const alpha = 0.3;
   smoothedScoreRef.current =
     alpha * rawScore + (1 - alpha) * smoothedScoreRef.current;
 
   const score = smoothedScoreRef.current;
 
-  // 🎯 SIGNAL (with buffer)
   let signal = "NEUTRAL";
   if (score > 2.5) signal = "RISK ON";
   if (score < -2.5) signal = "RISK OFF";
 
-  // 📊 REGIME
+  // 📊 regime
   let regime = "NEUTRAL";
-
   if (vix > 1 && spx < 0) regime = "RISK-OFF SHOCK";
   else if (oil > 0 && spx > 0) regime = "INFLATIONARY GROWTH";
   else if (usd > 0 && gold < 0) regime = "REAL YIELD PRESSURE";
   else if (spx > 0 && vix < 0) regime = "LIQUIDITY RISK-ON";
 
-  // 🔄 REGIME TRANSITION
+  // 🔄 transition
   const prevSignal = prevSignalRef.current;
   let transition = "";
 
@@ -83,30 +88,10 @@ function App() {
 
   prevSignalRef.current = signal;
 
-  // 🔮 PREDICTIVE SIGNAL (momentum + strength)
+  // 🔮 predictive
   let predictive = "NO EDGE";
-
   if (score > 3.5 && spx > 0) predictive = "BULLISH MOMENTUM";
   if (score < -3.5 && spx < 0) predictive = "BEARISH MOMENTUM";
-
-  // 🔔 ALERTS
-  useEffect(() => {
-    if (transition) {
-      console.log("ALERT:", transition);
-
-      // Browser alert (works on desktop + iPhone PWA)
-      if (window.Notification && Notification.permission === "granted") {
-        new Notification(`Signal Change: ${transition}`);
-      }
-    }
-  }, [signal]);
-
-  // Request permission once
-  useEffect(() => {
-    if (window.Notification && Notification.permission !== "granted") {
-      Notification.requestPermission();
-    }
-  }, []);
 
   return (
     <div style={{
@@ -128,12 +113,14 @@ function App() {
         {data.map((d, i) => (
           <div key={i}>
             <div style={{ fontSize: 20 }}>{d.name}</div>
-            <div style={{ fontSize: 28 }}>{d.price?.toFixed(2)}</div>
+            <div style={{ fontSize: 28 }}>
+              {d.price ? d.price.toFixed(2) : "—"}
+            </div>
             <div style={{
               fontSize: 22,
               color: d.pctChange > 0 ? "#22c55e" : "#ef4444"
             }}>
-              {d.pctChange?.toFixed(2)}%
+              {d.pctChange ? d.pctChange.toFixed(2) + "%" : "—"}
             </div>
           </div>
         ))}
@@ -178,7 +165,7 @@ function App() {
         <div style={{ lineHeight: 1.6 }}>{commentary}</div>
       </div>
 
-      {/* 🧠 MACRO ENGINE */}
+      {/* 🧠 SYSTEM */}
       <div style={{ marginTop: 15 }}>
         <div style={{ color: "#38bdf8" }}>MACRO REGIME</div>
         <div style={{ fontSize: 18 }}>{regime}</div>
