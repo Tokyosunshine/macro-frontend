@@ -5,6 +5,7 @@ function App() {
   const [takeaway, setTakeaway] = useState("");
   const [action, setAction] = useState("");
   const [commentary, setCommentary] = useState("");
+  const [confidence, setConfidence] = useState(null);
 
   const API_BASE = "https://macro-backend-cq9c.onrender.com";
 
@@ -19,6 +20,7 @@ function App() {
     setTakeaway(exp.takeaway);
     setAction(exp.action);
     setCommentary(exp.commentary);
+    setConfidence(exp.confidence);
   };
 
   useEffect(() => {
@@ -37,7 +39,7 @@ function App() {
     }}>
       <h2 style={{ fontSize: 18 }}>Macro Terminal</h2>
 
-      {/* 📊 GRID */}
+      {/* 📊 INDICATORS */}
       <div style={{
         display: "grid",
         gridTemplateColumns: "1fr 1fr",
@@ -50,30 +52,23 @@ function App() {
             border: "1px solid #1e293b",
             borderRadius: 10
           }}>
-            {/* 🔤 LABEL (↑ bigger) */}
             <div style={{
-              fontSize: 20,        // was 14 → +75%+
-              fontWeight: "500",
+              fontSize: 20,
               color: "#cbd5f5",
               marginBottom: 6
             }}>
               {d.name}
             </div>
 
-            {/* 💰 PRICE (unchanged) */}
             <div style={{
               fontSize: 28,
-              fontWeight: "bold",
-              lineHeight: 1.1
+              fontWeight: "bold"
             }}>
               {d.price ? d.price.toFixed(2) : "—"}
             </div>
 
-            {/* 📈 % CHANGE (↑ bigger) */}
             <div style={{
-              fontSize: 22,        // was 18 → +75% feel
-              marginTop: 4,
-              fontWeight: "600",
+              fontSize: 22,
               color:
                 d.pctChange > 0
                   ? "#22c55e"
@@ -87,53 +82,51 @@ function App() {
         ))}
       </div>
 
+      {/* 🎯 CONFIDENCE */}
+      <div style={{ marginTop: 12 }}>
+        <div style={{ fontSize: 12, color: "#38bdf8" }}>
+          CONFIDENCE
+        </div>
+        <div style={{ fontSize: 20 }}>
+          {confidence ? confidence + "%" : "—"}
+        </div>
+      </div>
+
       {/* 🔑 TAKEAWAY */}
-      <div style={{
-        marginTop: 15,
-        padding: 12,
-        background: "#111827",
-        borderRadius: 8
-      }}>
-        <div style={{ fontSize: 11, color: "#38bdf8" }}>
-          KEY TAKEAWAY
-        </div>
-        <div style={{ fontSize: 16, fontWeight: "bold" }}>
-          {takeaway}
-        </div>
+      <div style={{ marginTop: 10 }}>
+        <div style={{ fontSize: 12 }}>KEY TAKEAWAY</div>
+        <div style={{ fontSize: 16 }}>{takeaway}</div>
       </div>
 
       {/* 🎯 ACTION */}
-      <div style={{
-        marginTop: 10,
-        padding: 12,
-        background: "#111827",
-        borderRadius: 8
-      }}>
-        <div style={{ fontSize: 11, color: "#facc15" }}>
-          ACTION
-        </div>
-        <div style={{ fontSize: 16, fontWeight: "bold" }}>
-          {action}
-        </div>
+      <div style={{ marginTop: 10 }}>
+        <div style={{ fontSize: 12 }}>ACTION</div>
+        <div style={{ fontSize: 16 }}>{action}</div>
       </div>
 
       {/* 🤖 COMMENTARY */}
-      <div style={{
-        marginTop: 15,
-        padding: 12,
-        background: "#0f172a",
-        borderRadius: 8
-      }}>
-        <div style={{ fontSize: 11, color: "#38bdf8" }}>
-          AI MACRO COMMENTARY
-        </div>
-        <div style={{
-          fontSize: 14,
-          lineHeight: 1.6,
-          marginTop: 5
-        }}>
+      <div style={{ marginTop: 10 }}>
+        <div style={{ fontSize: 12 }}>COMMENTARY</div>
+        <div style={{ fontSize: 14, lineHeight: 1.6 }}>
           {commentary}
         </div>
+      </div>
+
+      {/* 📈 CHARTS */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 10,
+        marginTop: 15
+      }}>
+        {data.map((d, i) => (
+          <iframe
+            key={i}
+            src={`https://s.tradingview.com/widgetembed/?symbol=${d.symbol}&interval=60&theme=dark`}
+            style={{ width: "100%", height: 150 }}
+            title={d.name}
+          />
+        ))}
       </div>
     </div>
   );
