@@ -29,57 +29,90 @@ function App() {
     <div style={{
       maxWidth: 420,
       margin: "0 auto",
-      padding: 10,
+      padding: 12,
       background: "#020617",
       color: "#e2e8f0",
-      minHeight: "100vh"
+      minHeight: "100vh",
+      fontFamily: "Arial"
     }}>
-      <h2 style={{ fontSize: 16 }}>Macro Terminal</h2>
+      <h2 style={{ fontSize: 18 }}>Macro Terminal</h2>
 
-      {/* GRID */}
+      {/* 📊 GRID */}
       <div style={{
         display: "grid",
         gridTemplateColumns: "1fr 1fr",
-        gap: 8
+        gap: 10,
+        marginTop: 10
       }}>
         {data.map((d, i) => (
-          <div key={i} style={{ padding: 6 }}>
-            <div style={{ fontSize: 10 }}>{d.name}</div>
-            <div style={{ fontSize: 13 }}>
-              {d.price?.toFixed(2)}
+          <div key={i} style={{
+            padding: 10,
+            border: "1px solid #1e293b",
+            borderRadius: 8
+          }}>
+            <div style={{ fontSize: 12, color: "#94a3b8" }}>
+              {d.name}
             </div>
+
+            <div style={{ fontSize: 18 }}>
+              {d.price ? d.price.toFixed(2) : "—"}
+            </div>
+
             <div style={{
-              fontSize: 11,
-              color: d.pctChange > 0 ? "lime" : "red"
+              fontSize: 14,
+              color: d.pctChange > 0 ? "#22c55e" : "#ef4444"
             }}>
-              {d.pctChange?.toFixed(2)}%
+              {d.pctChange ? d.pctChange.toFixed(2) + "%" : "—"}
             </div>
           </div>
         ))}
       </div>
 
-      {/* TAKEAWAY */}
-      <div style={{ marginTop: 10 }}>
-        <div style={{ fontSize: 10, color: "#38bdf8" }}>
+      {/* 🔑 TAKEAWAY */}
+      <div style={{
+        marginTop: 15,
+        padding: 12,
+        background: "#111827",
+        borderRadius: 8
+      }}>
+        <div style={{ fontSize: 11, color: "#38bdf8" }}>
           KEY TAKEAWAY
         </div>
-        <div>{takeaway}</div>
+        <div style={{ fontSize: 16, fontWeight: "bold" }}>
+          {takeaway}
+        </div>
       </div>
 
-      {/* ACTION */}
-      <div style={{ marginTop: 8 }}>
-        <div style={{ fontSize: 10, color: "#facc15" }}>
+      {/* 🎯 ACTION */}
+      <div style={{
+        marginTop: 10,
+        padding: 12,
+        background: "#111827",
+        borderRadius: 8
+      }}>
+        <div style={{ fontSize: 11, color: "#facc15" }}>
           ACTION
         </div>
-        <div>{action}</div>
+        <div style={{ fontSize: 16, fontWeight: "bold" }}>
+          {action}
+        </div>
       </div>
 
-      {/* COMMENTARY */}
-      <div style={{ marginTop: 8 }}>
-        <div style={{ fontSize: 10 }}>
-          COMMENTARY
+      {/* 🤖 COMMENTARY (SCROLL SECTION) */}
+      <div style={{
+        marginTop: 15,
+        padding: 12,
+        background: "#0f172a",
+        borderRadius: 8
+      }}>
+        <div style={{ fontSize: 11, color: "#38bdf8" }}>
+          AI MACRO COMMENTARY
         </div>
-        <div style={{ fontSize: 12 }}>
+        <div style={{
+          fontSize: 14,
+          lineHeight: 1.6,
+          marginTop: 5
+        }}>
           {commentary}
         </div>
       </div>
