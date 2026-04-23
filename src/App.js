@@ -37,29 +37,38 @@ function App() {
     }}>
       <h2 style={{ fontSize: 18 }}>Macro Terminal</h2>
 
-      {/* 📊 GRID */}
+      {/* 📊 GRID (LARGE INDICATORS) */}
       <div style={{
         display: "grid",
         gridTemplateColumns: "1fr 1fr",
-        gap: 10,
-        marginTop: 10
+        gap: 12,
+        marginTop: 12
       }}>
         {data.map((d, i) => (
           <div key={i} style={{
-            padding: 10,
+            padding: 14,
             border: "1px solid #1e293b",
-            borderRadius: 8
+            borderRadius: 10
           }}>
-            <div style={{ fontSize: 12, color: "#94a3b8" }}>
+            <div style={{
+              fontSize: 14,
+              color: "#94a3b8",
+              marginBottom: 4
+            }}>
               {d.name}
             </div>
 
-            <div style={{ fontSize: 18 }}>
+            <div style={{
+              fontSize: 28,
+              fontWeight: "bold",
+              lineHeight: 1.1
+            }}>
               {d.price ? d.price.toFixed(2) : "—"}
             </div>
 
             <div style={{
-              fontSize: 14,
+              fontSize: 18,
+              marginTop: 2,
               color: d.pctChange > 0 ? "#22c55e" : "#ef4444"
             }}>
               {d.pctChange ? d.pctChange.toFixed(2) + "%" : "—"}
@@ -68,7 +77,7 @@ function App() {
         ))}
       </div>
 
-      {/* 🔑 TAKEAWAY */}
+      {/* 🔑 KEY TAKEAWAY */}
       <div style={{
         marginTop: 15,
         padding: 12,
@@ -98,7 +107,7 @@ function App() {
         </div>
       </div>
 
-      {/* 🤖 COMMENTARY (SCROLL SECTION) */}
+      {/* 🤖 AI COMMENTARY */}
       <div style={{
         marginTop: 15,
         padding: 12,
