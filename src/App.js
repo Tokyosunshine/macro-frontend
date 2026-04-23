@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 
 function App() {
   const [data, setData] = useState([]);
@@ -6,6 +6,10 @@ function App() {
   const [action, setAction] = useState("");
   const [commentary, setCommentary] = useState("");
   const [confidence, setConfidence] = useState(null);
+
+  // 🧠 MEMORY (persist across refresh)
+  const prevSignalRef = useRef(null);
+  const smoothedScoreRef = useRef(0);
 
   const API_BASE = "https://macro-backend-cq9c.onrender.com";
 
@@ -25,10 +29,11 @@ function App() {
 
   useEffect(() => {
     fetchData();
+    const interval = setInterval(fetchData, 30000);
+    return () => clearInterval(interval);
   }, []);
 
-  // 🔥 MACRO ENGINE
-
+  // 🔥 HELPER
   const get = (name) =>
     data.find(d => d.name === name)?.pctChange || 0;
 
@@ -39,31 +44,69 @@ function App() {
   const btc = get("Bitcoin");
   const oil = get("Oil");
 
-  let score = 0;
+  // 🔥 WEIGHTED SIGNAL
+  let rawScore = 0;
+  rawScore += usd > 0 ? -1.5 : 1.5;
+  rawScore += gold > 0 ? -1 : 1;
+  rawScore += spx > 0 ? 2 : -2;
+  rawScore += vix > 0 ? -2 : 1;
+  rawScore += btc > 0 ? 1 : -1;
+  rawScore += oil > 0 ? 0.5 : -0.5;
 
-  score += usd > 0 ? -1.5 : 1.5;
-  score += gold > 0 ? -1 : 1;
-  score += spx > 0 ? 2 : -2;
-  score += vix > 0 ? -2 : 1;
-  score += btc > 0 ? 1 : -1;
-  score += oil > 0 ? 0.5 : -0.5;
+  // 🧠 SMOOTHING (anti-noise)
+  const alpha = 0.3;
+  smoothedScoreRef.current =
+    alpha * rawScore + (1 - alpha) * smoothedScoreRef.current;
 
-  const signal =
-    score > 2 ? "RISK ON" :
-    score < -2 ? "RISK OFF" :
-    "NEUTRAL";
+  const score = smoothedScoreRef.current;
 
+  // 🎯 SIGNAL (with buffer)
+  let signal = "NEUTRAL";
+  if (score > 2.5) signal = "RISK ON";
+  if (score < -2.5) signal = "RISK OFF";
+
+  // 📊 REGIME
   let regime = "NEUTRAL";
 
   if (vix > 1 && spx < 0) regime = "RISK-OFF SHOCK";
   else if (oil > 0 && spx > 0) regime = "INFLATIONARY GROWTH";
   else if (usd > 0 && gold < 0) regime = "REAL YIELD PRESSURE";
-  else if (spx > 0 && vix < 0) regime = "RISK-ON LIQUIDITY";
+  else if (spx > 0 && vix < 0) regime = "LIQUIDITY RISK-ON";
 
+  // 🔄 REGIME TRANSITION
+  const prevSignal = prevSignalRef.current;
+  let transition = "";
+
+  if (prevSignal && prevSignal !== signal) {
+    transition = `${prevSignal} → ${signal}`;
+  }
+
+  prevSignalRef.current = signal;
+
+  // 🔮 PREDICTIVE SIGNAL (momentum + strength)
   let predictive = "NO EDGE";
 
-  if (score > 3) predictive = "SHORT-TERM BULLISH";
-  if (score < -3) predictive = "SHORT-TERM BEARISH";
+  if (score > 3.5 && spx > 0) predictive = "BULLISH MOMENTUM";
+  if (score < -3.5 && spx < 0) predictive = "BEARISH MOMENTUM";
+
+  // 🔔 ALERTS
+  useEffect(() => {
+    if (transition) {
+      console.log("ALERT:", transition);
+
+      // Browser alert (works on desktop + iPhone PWA)
+      if (window.Notification && Notification.permission === "granted") {
+        new Notification(`Signal Change: ${transition}`);
+      }
+    }
+  }, [signal]);
+
+  // Request permission once
+  useEffect(() => {
+    if (window.Notification && Notification.permission !== "granted") {
+      Notification.requestPermission();
+    }
+  }, []);
 
   return (
     <div style={{
@@ -88,7 +131,7 @@ function App() {
             <div style={{ fontSize: 28 }}>{d.price?.toFixed(2)}</div>
             <div style={{
               fontSize: 22,
-              color: d.pctChange > 0 ? "lime" : "red"
+              color: d.pctChange > 0 ? "#22c55e" : "#ef4444"
             }}>
               {d.pctChange?.toFixed(2)}%
             </div>
@@ -98,13 +141,20 @@ function App() {
 
       {/* 🔥 SIGNAL */}
       <div style={{ marginTop: 10 }}>
-        <div style={{ fontSize: 12 }}>SIGNAL</div>
+        <div>SIGNAL</div>
         <div style={{ fontSize: 22 }}>{signal}</div>
       </div>
 
+      {/* 🔄 TRANSITION */}
+      {transition && (
+        <div style={{ marginTop: 5, color: "#facc15" }}>
+          Transition: {transition}
+        </div>
+      )}
+
       {/* 🎯 CONFIDENCE */}
       <div style={{ marginTop: 8 }}>
-        <div style={{ fontSize: 12 }}>CONFIDENCE</div>
+        <div>CONFIDENCE</div>
         <div style={{ fontSize: 20 }}>
           {confidence ? confidence + "%" : "—"}
         </div>
@@ -112,48 +162,37 @@ function App() {
 
       {/* 🔑 TAKEAWAY */}
       <div style={{ marginTop: 8 }}>
-        <div style={{ fontSize: 12 }}>TAKEAWAY</div>
+        <div>TAKEAWAY</div>
         <div>{takeaway}</div>
       </div>
 
       {/* 🎯 ACTION */}
       <div style={{ marginTop: 8 }}>
-        <div style={{ fontSize: 12 }}>ACTION</div>
+        <div>ACTION</div>
         <div>{action}</div>
       </div>
 
       {/* 🤖 COMMENTARY */}
       <div style={{ marginTop: 10 }}>
-        <div style={{ fontSize: 12 }}>COMMENTARY</div>
+        <div>COMMENTARY</div>
         <div style={{ lineHeight: 1.6 }}>{commentary}</div>
       </div>
 
-      {/* 🧠 SYSTEM OUTPUT */}
+      {/* 🧠 MACRO ENGINE */}
       <div style={{ marginTop: 15 }}>
-        <div style={{ fontSize: 12, color: "#38bdf8" }}>
-          MACRO REGIME
-        </div>
-        <div style={{ fontSize: 18, fontWeight: "bold" }}>
-          {regime}
-        </div>
+        <div style={{ color: "#38bdf8" }}>MACRO REGIME</div>
+        <div style={{ fontSize: 18 }}>{regime}</div>
       </div>
 
       <div style={{ marginTop: 10 }}>
-        <div style={{ fontSize: 12, color: "#38bdf8" }}>
-          WEIGHTED SIGNAL
-        </div>
-        <div style={{ fontSize: 18 }}>
-          Score: {score.toFixed(2)} → {signal}
-        </div>
+        <div style={{ color: "#38bdf8" }}>WEIGHTED SIGNAL</div>
+        <div>Score: {score.toFixed(2)}</div>
       </div>
 
       <div style={{ marginTop: 10 }}>
-        <div style={{ fontSize: 12, color: "#38bdf8" }}>
-          PREDICTIVE SIGNAL
-        </div>
+        <div style={{ color: "#38bdf8" }}>PREDICTIVE SIGNAL</div>
         <div style={{
           fontSize: 18,
-          fontWeight: "bold",
           color:
             predictive.includes("BULLISH") ? "#22c55e" :
             predictive.includes("BEARISH") ? "#ef4444" :
