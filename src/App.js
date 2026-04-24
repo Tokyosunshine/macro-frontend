@@ -3,6 +3,7 @@ import React, { useEffect, useState, useRef } from "react";
 function App() {
   const [data, setData] = useState([]);
   const [sheetData, setSheetData] = useState([]);
+
   const [takeaway, setTakeaway] = useState("");
   const [action, setAction] = useState("");
   const [commentary, setCommentary] = useState("");
@@ -11,15 +12,20 @@ function App() {
 
   const API_BASE = "https://macro-backend-cq9c.onrender.com";
 
-  // 🔄 FETCH
-  const fetchData = async () => {
+  // 🔄 MARKET DATA (AUTO)
+  const fetchPrices = async () => {
     try {
       const prices = await (await fetch(API_BASE + "/api/prices")).json();
       if (Array.isArray(prices)) setData(prices);
 
       const sheet = await (await fetch(API_BASE + "/api/sheet")).json();
       if (Array.isArray(sheet)) setSheetData(sheet);
+    } catch {}
+  };
 
+  // 🤖 AI (MANUAL BUTTON)
+  const fetchAI = async () => {
+    try {
       const exp = await (await fetch(API_BASE + "/api/explain")).json();
       setTakeaway(exp.takeaway || "");
       setAction(exp.action || "");
@@ -28,8 +34,8 @@ function App() {
   };
 
   useEffect(() => {
-    fetchData();
-    const i = setInterval(fetchData, 30000);
+    fetchPrices();
+    const i = setInterval(fetchPrices, 60000); // slower refresh
     return () => clearInterval(i);
   }, []);
 
@@ -37,53 +43,28 @@ function App() {
   const get = (name) =>
     data.find(d => d.name === name)?.pctChange || 0;
 
-  const getSheet = (key) =>
-    sheetData.find(r => r.key === key)?.value || "";
-
   const usd = get("USD/CHF");
   const spx = get("SPX Futures");
   const vix = get("VIX");
-
-  // 🧠 1. ADAPTIVE WEIGHTS (VIX regime)
-  let w_spx = 2;
-  let w_usd = 1.5;
-  let w_vix = 2;
-
-  if (vix > 1) {
-    w_spx *= 0.7;   // dampen equities in high vol
-    w_usd *= 1.2;   // USD matters more
-  }
+  const rates = get("US 10Y");
+  const oil = get("Oil");
+  const gold = get("Gold");
+  const btc = get("Bitcoin");
 
   const t = 0.3;
 
-  // 🔥 RAW SIGNAL CONTRIBUTIONS
-  const contributions = [
-    {
-      name: "USD",
-      value: usd,
-      score: usd > t ? -w_usd : usd < -t ? w_usd : 0
-    },
-    {
-      name: "SPX",
-      value: spx,
-      score: spx > t ? w_spx : spx < -t ? -w_spx : 0
-    },
-    {
-      name: "VIX",
-      value: vix,
-      score: vix > t ? -w_vix : vix < -t ? w_vix : 0
-    }
+  // 🔥 MULTI-FACTOR MODEL
+  const factors = [
+    { name: "USD", val: usd, score: usd > t ? -1.5 : usd < -t ? 1.5 : 0 },
+    { name: "SPX", val: spx, score: spx > t ? 2 : spx < -t ? -2 : 0 },
+    { name: "VIX", val: vix, score: vix > t ? -2 : vix < -t ? 1 : 0 },
+    { name: "Rates", val: rates, score: rates > t ? -1 : rates < -t ? 1 : 0 },
+    { name: "Oil", val: oil, score: oil > t ? 1 : oil < -t ? -1 : 0 },
+    { name: "Gold", val: gold, score: gold > t ? -1 : gold < -t ? 0.5 : 0 },
+    { name: "BTC", val: btc, score: btc > t ? 1.5 : btc < -t ? -1.5 : 0 }
   ];
 
-  let rawScore = contributions.reduce((sum, c) => sum + c.score, 0);
-
-  // 🧠 2. SHEET INFLUENCE
-  const position = getSheet("Portfolio").toLowerCase();
-  const bias = getSheet("Bias").toLowerCase();
-
-  if (position.includes("defensive")) rawScore *= 0.7;
-  if (bias.includes("risk on")) rawScore += 1;
-  if (bias.includes("risk off")) rawScore -= 1;
+  let rawScore = factors.reduce((s, f) => s + f.score, 0);
 
   // 🔥 SMOOTHING
   const alpha = 0.3;
@@ -92,38 +73,26 @@ function App() {
 
   const score = smoothedScoreRef.current;
 
-  // 🧠 3. LOGISTIC PROBABILITY (REAL MODEL)
+  // 🔥 PROBABILITY (LOGISTIC)
   const probability = 100 / (1 + Math.exp(-score));
 
   const regime =
-    score > 2.5 ? "RISK ON" :
-    score < -2.5 ? "RISK OFF" :
+    score > 3 ? "RISK ON" :
+    score < -3 ? "RISK OFF" :
     "NEUTRAL";
 
-  // 🧠 4. TOP DRIVERS (RANKED)
-  const topDrivers = contributions
-    .filter(c => Math.abs(c.score) > 0)
+  // 🔥 TOP DRIVERS
+  const topDrivers = factors
+    .filter(f => Math.abs(f.score) > 0)
     .sort((a, b) => Math.abs(b.score) - Math.abs(a.score))
-    .slice(0, 2)
-    .map(c =>
-      c.name +
-      (c.value > t ? "↑" : c.value < -t ? "↓" : "")
-    )
+    .slice(0, 3)
+    .map(f => f.name + (f.val > t ? "↑" : f.val < -t ? "↓" : ""))
     .join(" ");
 
-  // 🧠 5. POSITION SUGGESTION
+  // 🔥 SUGGESTION
   let suggestion = "HOLD";
   if (score > 3 && probability > 70) suggestion = "ADD RISK";
   if (score < -3 && probability > 70) suggestion = "REDUCE RISK";
-
-  // 🎨
-  const getSignalColor = (s) => {
-    if (s > 3) return "#22c55e";
-    if (s > 1) return "#86efac";
-    if (s < -3) return "#ef4444";
-    if (s < -1) return "#fca5a5";
-    return "#e2e8f0";
-  };
 
   const formatPrice = v =>
     typeof v === "number" ? v.toFixed(2) : "—";
@@ -141,14 +110,13 @@ function App() {
     }}>
       <h2>Macro Terminal</h2>
 
-      {/* 📊 INDICATORS */}
+      {/* INDICATORS */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         {data.map((d, i) => (
           <div key={i}>
-            <div style={{ fontSize: 20 }}>{d.name}</div>
-            <div style={{ fontSize: 28 }}>{formatPrice(d.price)}</div>
+            <div>{d.name}</div>
+            <div style={{ fontSize: 24 }}>{formatPrice(d.price)}</div>
             <div style={{
-              fontSize: 22,
               color: d.pctChange > 0 ? "#22c55e" : "#ef4444"
             }}>
               {formatPct(d.pctChange)}
@@ -157,56 +125,49 @@ function App() {
         ))}
       </div>
 
-      {/* 🧾 GOOGLE SHEET */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 10 }}>
+      {/* GOOGLE SHEET */}
+      <div style={{ marginTop: 10 }}>
         {sheetData.map((row, i) => (
           <div key={i}>
-            <div style={{ fontSize: 20 }}>{row.key}</div>
-            <div style={{ fontSize: 28 }}>{row.value}</div>
+            {row.key}: {row.value}
           </div>
         ))}
       </div>
 
-      {/* 🤖 AI */}
+      {/* 🤖 BUTTON */}
+      <button
+        onClick={fetchAI}
+        style={{
+          marginTop: 10,
+          padding: 8,
+          background: "#38bdf8",
+          color: "black",
+          border: "none",
+          cursor: "pointer"
+        }}
+      >
+        Refresh AI
+      </button>
+
+      {/* AI OUTPUT */}
       <div style={{ marginTop: 10 }}>
-        <div>TAKEAWAY</div>
-        <div>{takeaway}</div>
+        <div><b>Takeaway:</b> {takeaway}</div>
+        <div><b>Action:</b> {action}</div>
+        <div>{commentary}</div>
       </div>
 
-      <div>
-        <div>ACTION</div>
-        <div>{action}</div>
-      </div>
-
-      <div style={{ marginTop: 10 }}>
-        {commentary}
-      </div>
-
-      {/* 🔥 HEDGE FUND SIGNAL LAYER */}
+      {/* 🔥 SIGNAL ENGINE */}
       <div style={{ marginTop: 20 }}>
-        <div style={{ color: "#38bdf8" }}>MACRO REGIME</div>
-        <div style={{ fontSize: 22 }}>{regime}</div>
+        <div>REGIME: {regime}</div>
+        <div>WEIGHTED SIGNAL: {score.toFixed(2)}</div>
 
-        <div style={{ marginTop: 6 }}>WEIGHTED SIGNAL</div>
-        <div style={{
-          fontSize: 24,
-          color: getSignalColor(score)
-        }}>
-          {score.toFixed(2)}
+        <div style={{ fontSize: 12 }}>
+          -5 Risk-Off Extreme | 0 Neutral | +5 Risk-On Extreme
         </div>
 
-        <div style={{ fontSize: 12, color: "#94a3b8" }}>
-          -5 Extreme Risk-Off | 0 Neutral | +5 Extreme Risk-On
-        </div>
-
-        <div style={{ marginTop: 6 }}>PROBABILITY</div>
-        <div>{probability.toFixed(0)}%</div>
-
-        <div>TOP DRIVERS</div>
-        <div>{topDrivers || "—"}</div>
-
-        <div>SUGGESTION</div>
-        <div style={{ fontWeight: "bold" }}>{suggestion}</div>
+        <div>PROBABILITY: {probability.toFixed(0)}%</div>
+        <div>DRIVERS: {topDrivers}</div>
+        <div><b>SUGGESTION: {suggestion}</b></div>
       </div>
 
     </div>
