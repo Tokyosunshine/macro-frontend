@@ -70,7 +70,7 @@ function App() {
     }}>
       <h2>Macro Terminal</h2>
 
-      {/* INDICATORS */}
+      {/* 📊 TOP INDICATORS */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         {data.map((d, i) => (
           <div key={i}>
@@ -86,7 +86,7 @@ function App() {
         ))}
       </div>
 
-      {/* GOOGLE SHEET */}
+      {/* 🧾 GOOGLE SHEET */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 10 }}>
         {sheetData.map((row, i) => (
           <div key={i}>
@@ -105,7 +105,7 @@ function App() {
         ))}
       </div>
 
-      {/* SIGNAL */}
+      {/* 🔥 SIGNAL */}
       <div style={{ marginTop: 10 }}>
         <div>SIGNAL</div>
         <div style={{ fontSize: 22 }}>{signal}</div>
@@ -113,6 +113,7 @@ function App() {
 
       <div>PROBABILITY: {probability.toFixed(0)}%</div>
 
+      {/* 🤖 AI */}
       <div style={{ marginTop: 10 }}>
         <div>TAKEAWAY</div>
         <div>{takeaway}</div>
@@ -125,6 +126,38 @@ function App() {
 
       <div style={{ marginTop: 10 }}>
         <div>{commentary}</div>
+      </div>
+
+      {/* 📊 BOTTOM INDICATORS */}
+      <div style={{ marginTop: 20 }}>
+        <div style={{ color: "#38bdf8", marginBottom: 6 }}>
+          MARKET SNAPSHOT
+        </div>
+
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 12
+        }}>
+          {data.map((d, i) => (
+            <div key={"bottom-" + i}>
+              <div style={{ fontSize: 16 }}>
+                {d.name}
+              </div>
+
+              <div style={{ fontSize: 22 }}>
+                {d.price ? d.price.toFixed(2) : "—"}
+              </div>
+
+              <div style={{
+                fontSize: 18,
+                color: d.pctChange > 0 ? "#22c55e" : "#ef4444"
+              }}>
+                {d.pctChange ? d.pctChange.toFixed(2) + "%" : "—"}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
     </div>
