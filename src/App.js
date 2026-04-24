@@ -12,19 +12,28 @@ function App() {
 
   const API_BASE = "https://macro-backend-cq9c.onrender.com";
 
+  // 🔄 FETCH DATA
   const fetchData = async () => {
-    const prices = await (await fetch(`${API_BASE}/api/prices`)).json();
-    setData(prices);
+    try {
+      const pricesRes = await fetch(`${API_BASE}/api/prices`);
+      const prices = await pricesRes.json();
+      setData(prices || []);
 
-    const sheet = await (await fetch(`${API_BASE}/api/sheet`)).json();
-    setSheetData(sheet);
+      const sheetRes = await fetch(`${API_BASE}/api/sheet`);
+      const sheet = await sheetRes.json();
+      setSheetData(sheet || []);
 
-    const exp = await (await fetch(`${API_BASE}/api/explain`)).json();
+      const expRes = await fetch(`${API_BASE}/api/explain`);
+      const exp = await expRes.json();
 
-    setTakeaway(exp.takeaway);
-    setAction(exp.action);
-    setCommentary(exp.commentary);
-    setConfidence(exp.confidence);
+      setTakeaway(exp?.takeaway || "");
+      setAction(exp?.action || "");
+      setCommentary(exp?.commentary || "");
+      setConfidence(exp?.confidence ?? null);
+
+    } catch (err) {
+      console.log("Fetch error:", err);
+    }
   };
 
   useEffect(() => {
@@ -33,6 +42,7 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // 🔥 HELPER
   const get = (name) =>
     data.find(d => d.name === name)?.pctChange || 0;
 
@@ -40,6 +50,7 @@ function App() {
   const spx = get("SPX Futures");
   const vix = get("VIX");
 
+  // 🔥 NOISE FILTER
   const t = 0.3;
 
   let rawScore = 0;
@@ -47,6 +58,7 @@ function App() {
   rawScore += spx > t ? 2 : spx < -t ? -2 : 0;
   rawScore += vix > t ? -2 : vix < -t ? 1 : 0;
 
+  // 🔥 SMOOTHING
   const alpha = 0.3;
   smoothedScoreRef.current =
     alpha * rawScore + (1 - alpha) * smoothedScoreRef.current;
@@ -61,40 +73,79 @@ function App() {
   const probability = Math.min(100, Math.abs(score) * 20);
 
   return (
-    <div style={{ maxWidth: 420, margin: "0 auto", padding: 12, background: "#020617", color: "#e2e8f0" }}>
+    <div style={{
+      maxWidth: 420,
+      margin: "0 auto",
+      padding: 12,
+      background: "#020617",
+      color: "#e2e8f0",
+      minHeight: "100vh"
+    }}>
       <h2>Macro Terminal</h2>
 
-      {/* INDICATORS */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      {/* 📊 INDICATORS */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 12
+      }}>
         {data.map((d, i) => (
           <div key={i}>
-            <div style={{ fontSize: 20 }}>{d.name}</div>
-            <div style={{ fontSize: 28 }}>{d.price?.toFixed(2)}</div>
+            <div style={{ fontSize: 20 }}>
+              {d.name}
+            </div>
+
+            <div style={{ fontSize: 28 }}>
+              {d.price ? d.price.toFixed(2) : "—"}
+            </div>
+
             <div style={{
               fontSize: 22,
               color: d.pctChange > 0 ? "#22c55e" : "#ef4444"
             }}>
-              {d.pctChange?.toFixed(2)}%
+              {d.pctChange ? d.pctChange.toFixed(2) + "%" : "—"}
             </div>
           </div>
         ))}
       </div>
 
-      {/* GOOGLE SHEET (same style) */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 10 }}>
-        {sheetData.map((row, i) => (
-          <div key={i}>
-            <div style={{ fontSize: 20 }}>{row.key}</div>
-            <div style={{ fontSize: 28 }}>{row.value}</div>
-          </div>
-        ))}
-      </div>
+      {/* 🧾 GOOGLE SHEET */}
+      {sheetData && sheetData.length > 0 && (
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 12,
+          marginTop: 10
+        }}>
+          {sheetData.map((row, i) => (
+            <div key={i}>
+              <div style={{ fontSize: 20 }}>
+                {row.key}
+              </div>
 
-      {/* SIGNAL */}
+              <div style={{
+                fontSize: 28,
+                color:
+                  row.value?.toLowerCase().includes("long") ? "#22c55e" :
+                  row.value?.toLowerCase().includes("short") ? "#ef4444" :
+                  row.key === "Last Update" ? "#38bdf8" :
+                  "#e2e8f0"
+              }}>
+                {row.value}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 🔥 SIGNAL */}
       <div style={{ marginTop: 10 }}>
         <div>SIGNAL</div>
-        <div style={{ fontSize: 22 }}>{signal}</div>
+        <div style={{ fontSize: 22 }}>
+          {signal}
+        </div>
 
+        {/* DRIVER EXPLANATION */}
         <div style={{ fontSize: 12, color: "#94a3b8" }}>
           Drivers:
           {usd > t && " USD↑"}
@@ -103,24 +154,44 @@ function App() {
         </div>
       </div>
 
-      {/* PROBABILITY */}
+      {/* 🎯 PROBABILITY */}
       <div style={{ marginTop: 5 }}>
-        PROBABILITY: {probability.toFixed(0)}%
+        <div>PROBABILITY</div>
+        <div style={{ fontSize: 20 }}>
+          {probability.toFixed(0)}%
+        </div>
       </div>
 
-      {/* LEGEND */}
+      {/* 📊 LEGEND */}
       <div style={{ fontSize: 12, color: "#94a3b8" }}>
         &lt; -3 Risk-Off | -2 to 2 Neutral | &gt; 3 Risk-On
       </div>
 
-      {/* AI */}
+      {/* 🤖 AI */}
       <div style={{ marginTop: 10 }}>
-        TAKEAWAY: {takeaway}
+        <div>AI CONFIDENCE</div>
+        <div>
+          {confidence ? confidence + "%" : "—"}
+        </div>
       </div>
 
-      <div>ACTION: {action}</div>
+      <div style={{ marginTop: 8 }}>
+        <div>TAKEAWAY</div>
+        <div>{takeaway}</div>
+      </div>
 
-      <div style={{ marginTop: 10 }}>{commentary}</div>
+      <div style={{ marginTop: 8 }}>
+        <div>ACTION</div>
+        <div>{action}</div>
+      </div>
+
+      <div style={{ marginTop: 10 }}>
+        <div>COMMENTARY</div>
+        <div style={{ lineHeight: 1.6 }}>
+          {commentary}
+        </div>
+      </div>
+
     </div>
   );
 }
