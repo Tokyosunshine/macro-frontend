@@ -13,25 +13,19 @@ function App() {
 
   const API_BASE = "https://macro-backend-cq9c.onrender.com";
 
-  // 🔄 FETCH PRICES + SHEET
   const fetchPrices = async () => {
-    try {
-      const prices = await (await fetch(API_BASE + "/api/prices")).json();
-      if (Array.isArray(prices)) setData(prices);
+    const prices = await (await fetch(API_BASE + "/api/prices")).json();
+    if (Array.isArray(prices)) setData(prices);
 
-      const sheet = await (await fetch(API_BASE + "/api/sheet")).json();
-      if (Array.isArray(sheet)) setSheetData(sheet);
-    } catch {}
+    const sheet = await (await fetch(API_BASE + "/api/sheet")).json();
+    if (Array.isArray(sheet)) setSheetData(sheet);
   };
 
-  // 🤖 AI (manual)
   const fetchAI = async () => {
-    try {
-      const exp = await (await fetch(API_BASE + "/api/explain")).json();
-      setTakeaway(exp.takeaway || "");
-      setAction(exp.action || "");
-      setCommentary(exp.commentary || "");
-    } catch {}
+    const exp = await (await fetch(API_BASE + "/api/explain")).json();
+    setTakeaway(exp.takeaway || "");
+    setAction(exp.action || "");
+    setCommentary(exp.commentary || "");
   };
 
   useEffect(() => {
@@ -40,8 +34,7 @@ function App() {
     return () => clearInterval(i);
   }, []);
 
-  // 🔧 HELPERS
-  const get = (name) =>
+  const get = name =>
     data.find(d => d.name === name)?.pctChange || 0;
 
   const usd = get("USD/CHF");
@@ -51,10 +44,10 @@ function App() {
   const oil = get("Oil");
   const gold = get("Gold");
   const btc = get("Bitcoin");
+  const copper = get("Copper");
 
   const t = 0.3;
 
-  // 🔥 MULTI FACTOR MODEL
   const factors = [
     { name: "USD", val: usd, score: usd > t ? -1.5 : usd < -t ? 1.5 : 0 },
     { name: "SPX", val: spx, score: spx > t ? 2 : spx < -t ? -2 : 0 },
@@ -62,51 +55,42 @@ function App() {
     { name: "Rates", val: rates, score: rates > t ? -1 : rates < -t ? 1 : 0 },
     { name: "Oil", val: oil, score: oil > t ? 1 : oil < -t ? -1 : 0 },
     { name: "Gold", val: gold, score: gold > t ? -1 : gold < -t ? 0.5 : 0 },
-    { name: "BTC", val: btc, score: btc > t ? 1.5 : btc < -t ? -1.5 : 0 }
+    { name: "BTC", val: btc, score: btc > t ? 1.5 : btc < -t ? -1.5 : 0 },
+    { name: "Copper", val: copper, score: copper > t ? 1 : copper < -t ? -1 : 0 }
   ];
 
   let rawScore = factors.reduce((s, f) => s + f.score, 0);
 
-  // 🔄 SMOOTHING
   const alpha = 0.3;
   smoothedScoreRef.current =
     alpha * rawScore + (1 - alpha) * smoothedScoreRef.current;
 
   const score = smoothedScoreRef.current;
 
-  // 📊 PROBABILITY
   const probability = 100 / (1 + Math.exp(-score));
 
-  // 🔥 REGIME
   const regime =
     score > 3 ? "RISK ON" :
     score < -3 ? "RISK OFF" :
     "NEUTRAL";
 
-  // 🔥 PHASE
   let phase = "TRANSITION";
   if (score > 2 && spx > 0 && vix < 0) phase = "EXPANSION";
   if (score < -2 && spx < 0 && vix > 0) phase = "CONTRACTION";
   if (Math.abs(score) < 1) phase = "LATE CYCLE";
 
-  // 🔥 PERSISTENCE
-  if (Math.abs(score) > 2) {
-    persistenceRef.current += 1;
-  } else {
-    persistenceRef.current = 0;
-  }
+  if (Math.abs(score) > 2) persistenceRef.current++;
+  else persistenceRef.current = 0;
 
   const persistence =
     persistenceRef.current > 5 ? "STRONG TREND" :
     persistenceRef.current > 2 ? "TREND BUILDING" :
     "NO TREND";
 
-  // 🔥 WARNING
   let warning = "NONE";
   if (score > 2 && vix > 0.5) warning = "RISK BUILDING";
   if (score < -2 && spx > 0.5) warning = "SHORT SQUEEZE RISK";
 
-  // 🔥 DRIVERS
   const topDrivers = factors
     .filter(f => Math.abs(f.score) > 0)
     .sort((a, b) => Math.abs(b.score) - Math.abs(a.score))
@@ -114,105 +98,39 @@ function App() {
     .map(f => f.name + (f.val > t ? "↑" : f.val < -t ? "↓" : ""))
     .join(" ");
 
-  // 🔥 SUGGESTION
   let suggestion = "HOLD";
   if (score > 3 && probability > 70) suggestion = "ADD RISK";
   if (score < -3 && probability > 70) suggestion = "REDUCE RISK";
 
-  // 🎨 FORMAT
-  const formatPrice = v =>
-    typeof v === "number" ? v.toFixed(2) : "—";
-
-  const formatPct = v =>
-    typeof v === "number" ? v.toFixed(2) + "%" : "—";
+  let allocation = "50/50";
+  if (score > 3) allocation = "80-90% Risk";
+  else if (score > 1) allocation = "60-70% Risk";
+  else if (score < -3) allocation = "10-20% Risk";
+  else if (score < -1) allocation = "20-40% Risk";
 
   return (
-    <div style={{
-      maxWidth: 420,
-      margin: "0 auto",
-      padding: 12,
-      background: "#020617",
-      color: "#e2e8f0"
-    }}>
+    <div style={{ maxWidth: 420, margin: "0 auto", padding: 12, background: "#020617", color: "#e2e8f0" }}>
       <h2>Macro Terminal</h2>
 
-      {/* 📊 INDICATORS */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        {data.map((d, i) => (
-          <div key={i}>
-            <div style={{ fontSize: 20 }}>{d.name}</div>
-            <div style={{ fontSize: 28 }}>{formatPrice(d.price)}</div>
-            <div style={{
-              fontSize: 22,
-              color: d.pctChange > 0 ? "#22c55e" : "#ef4444"
-            }}>
-              {formatPct(d.pctChange)}
-            </div>
-          </div>
-        ))}
-      </div>
+      <button onClick={fetchAI}>Refresh AI</button>
 
-      {/* 🧾 GOOGLE SHEET (FIXED STYLE) */}
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "1fr 1fr",
-        gap: 12,
-        marginTop: 10
-      }}>
-        {sheetData.map((row, i) => {
-          const val = row.value || "";
-          const lower = typeof val === "string" ? val.toLowerCase() : "";
-
-          let color = "#e2e8f0";
-          if (lower.includes("long")) color = "#22c55e";
-          if (lower.includes("short")) color = "#ef4444";
-          if (row.key === "Last Update") color = "#38bdf8";
-
-          return (
-            <div key={i}>
-              <div style={{ fontSize: 20 }}>{row.key}</div>
-              <div style={{ fontSize: 28, color }}>{val}</div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* 🤖 BUTTON */}
-      <button onClick={fetchAI} style={{
-        marginTop: 10,
-        padding: 8,
-        background: "#38bdf8",
-        color: "black",
-        border: "none",
-        cursor: "pointer"
-      }}>
-        Refresh AI
-      </button>
-
-      {/* 🤖 AI */}
       <div style={{ marginTop: 10 }}>
-        <div><b>Takeaway:</b> {takeaway}</div>
-        <div><b>Action:</b> {action}</div>
+        <b>Takeaway:</b> {takeaway}<br />
+        <b>Action:</b> {action}
         <div>{commentary}</div>
       </div>
 
-      {/* 🔥 SIGNAL ENGINE */}
       <div style={{ marginTop: 20 }}>
         <div>REGIME: {regime}</div>
         <div>PHASE: {phase}</div>
-        <div>WEIGHTED SIGNAL: {score.toFixed(2)}</div>
-
-        <div style={{ fontSize: 12 }}>
-          -5 Risk-Off Extreme | 0 Neutral | +5 Risk-On Extreme
-        </div>
-
+        <div>SIGNAL: {score.toFixed(2)}</div>
         <div>PROBABILITY: {probability.toFixed(0)}%</div>
         <div>PERSISTENCE: {persistence}</div>
         <div>WARNING: {warning}</div>
         <div>DRIVERS: {topDrivers}</div>
-        <div><b>SUGGESTION: {suggestion}</b></div>
+        <div>SUGGESTION: {suggestion}</div>
+        <div><b>ALLOCATION: {allocation}</b></div>
       </div>
-
     </div>
   );
 }
