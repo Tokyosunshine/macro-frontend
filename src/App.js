@@ -9,10 +9,11 @@ function App() {
   const [commentary, setCommentary] = useState("");
 
   const smoothedScoreRef = useRef(0);
+  const persistenceRef = useRef(0);
 
   const API_BASE = "https://macro-backend-cq9c.onrender.com";
 
-  // 🔄 MARKET DATA (AUTO)
+  // 🔄 FETCH PRICES + SHEET
   const fetchPrices = async () => {
     try {
       const prices = await (await fetch(API_BASE + "/api/prices")).json();
@@ -23,7 +24,7 @@ function App() {
     } catch {}
   };
 
-  // 🤖 AI (MANUAL BUTTON)
+  // 🤖 AI (manual)
   const fetchAI = async () => {
     try {
       const exp = await (await fetch(API_BASE + "/api/explain")).json();
@@ -35,7 +36,7 @@ function App() {
 
   useEffect(() => {
     fetchPrices();
-    const i = setInterval(fetchPrices, 60000); // slower refresh
+    const i = setInterval(fetchPrices, 60000);
     return () => clearInterval(i);
   }, []);
 
@@ -53,7 +54,7 @@ function App() {
 
   const t = 0.3;
 
-  // 🔥 MULTI-FACTOR MODEL
+  // 🔥 MULTI FACTOR MODEL
   const factors = [
     { name: "USD", val: usd, score: usd > t ? -1.5 : usd < -t ? 1.5 : 0 },
     { name: "SPX", val: spx, score: spx > t ? 2 : spx < -t ? -2 : 0 },
@@ -66,22 +67,46 @@ function App() {
 
   let rawScore = factors.reduce((s, f) => s + f.score, 0);
 
-  // 🔥 SMOOTHING
+  // 🔄 SMOOTHING
   const alpha = 0.3;
   smoothedScoreRef.current =
     alpha * rawScore + (1 - alpha) * smoothedScoreRef.current;
 
   const score = smoothedScoreRef.current;
 
-  // 🔥 PROBABILITY (LOGISTIC)
+  // 📊 PROBABILITY
   const probability = 100 / (1 + Math.exp(-score));
 
+  // 🔥 REGIME
   const regime =
     score > 3 ? "RISK ON" :
     score < -3 ? "RISK OFF" :
     "NEUTRAL";
 
-  // 🔥 TOP DRIVERS
+  // 🔥 PHASE
+  let phase = "TRANSITION";
+  if (score > 2 && spx > 0 && vix < 0) phase = "EXPANSION";
+  if (score < -2 && spx < 0 && vix > 0) phase = "CONTRACTION";
+  if (Math.abs(score) < 1) phase = "LATE CYCLE";
+
+  // 🔥 PERSISTENCE
+  if (Math.abs(score) > 2) {
+    persistenceRef.current += 1;
+  } else {
+    persistenceRef.current = 0;
+  }
+
+  const persistence =
+    persistenceRef.current > 5 ? "STRONG TREND" :
+    persistenceRef.current > 2 ? "TREND BUILDING" :
+    "NO TREND";
+
+  // 🔥 WARNING
+  let warning = "NONE";
+  if (score > 2 && vix > 0.5) warning = "RISK BUILDING";
+  if (score < -2 && spx > 0.5) warning = "SHORT SQUEEZE RISK";
+
+  // 🔥 DRIVERS
   const topDrivers = factors
     .filter(f => Math.abs(f.score) > 0)
     .sort((a, b) => Math.abs(b.score) - Math.abs(a.score))
@@ -94,6 +119,7 @@ function App() {
   if (score > 3 && probability > 70) suggestion = "ADD RISK";
   if (score < -3 && probability > 70) suggestion = "REDUCE RISK";
 
+  // 🎨 FORMAT
   const formatPrice = v =>
     typeof v === "number" ? v.toFixed(2) : "—";
 
@@ -110,13 +136,14 @@ function App() {
     }}>
       <h2>Macro Terminal</h2>
 
-      {/* INDICATORS */}
+      {/* 📊 INDICATORS */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         {data.map((d, i) => (
           <div key={i}>
-            <div>{d.name}</div>
-            <div style={{ fontSize: 24 }}>{formatPrice(d.price)}</div>
+            <div style={{ fontSize: 20 }}>{d.name}</div>
+            <div style={{ fontSize: 28 }}>{formatPrice(d.price)}</div>
             <div style={{
+              fontSize: 22,
               color: d.pctChange > 0 ? "#22c55e" : "#ef4444"
             }}>
               {formatPct(d.pctChange)}
@@ -125,31 +152,44 @@ function App() {
         ))}
       </div>
 
-      {/* GOOGLE SHEET */}
-      <div style={{ marginTop: 10 }}>
-        {sheetData.map((row, i) => (
-          <div key={i}>
-            {row.key}: {row.value}
-          </div>
-        ))}
+      {/* 🧾 GOOGLE SHEET (FIXED STYLE) */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 12,
+        marginTop: 10
+      }}>
+        {sheetData.map((row, i) => {
+          const val = row.value || "";
+          const lower = typeof val === "string" ? val.toLowerCase() : "";
+
+          let color = "#e2e8f0";
+          if (lower.includes("long")) color = "#22c55e";
+          if (lower.includes("short")) color = "#ef4444";
+          if (row.key === "Last Update") color = "#38bdf8";
+
+          return (
+            <div key={i}>
+              <div style={{ fontSize: 20 }}>{row.key}</div>
+              <div style={{ fontSize: 28, color }}>{val}</div>
+            </div>
+          );
+        })}
       </div>
 
       {/* 🤖 BUTTON */}
-      <button
-        onClick={fetchAI}
-        style={{
-          marginTop: 10,
-          padding: 8,
-          background: "#38bdf8",
-          color: "black",
-          border: "none",
-          cursor: "pointer"
-        }}
-      >
+      <button onClick={fetchAI} style={{
+        marginTop: 10,
+        padding: 8,
+        background: "#38bdf8",
+        color: "black",
+        border: "none",
+        cursor: "pointer"
+      }}>
         Refresh AI
       </button>
 
-      {/* AI OUTPUT */}
+      {/* 🤖 AI */}
       <div style={{ marginTop: 10 }}>
         <div><b>Takeaway:</b> {takeaway}</div>
         <div><b>Action:</b> {action}</div>
@@ -159,6 +199,7 @@ function App() {
       {/* 🔥 SIGNAL ENGINE */}
       <div style={{ marginTop: 20 }}>
         <div>REGIME: {regime}</div>
+        <div>PHASE: {phase}</div>
         <div>WEIGHTED SIGNAL: {score.toFixed(2)}</div>
 
         <div style={{ fontSize: 12 }}>
@@ -166,6 +207,8 @@ function App() {
         </div>
 
         <div>PROBABILITY: {probability.toFixed(0)}%</div>
+        <div>PERSISTENCE: {persistence}</div>
+        <div>WARNING: {warning}</div>
         <div>DRIVERS: {topDrivers}</div>
         <div><b>SUGGESTION: {suggestion}</b></div>
       </div>
