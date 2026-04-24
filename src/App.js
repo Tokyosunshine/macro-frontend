@@ -13,19 +13,25 @@ function App() {
 
   const API_BASE = "https://macro-backend-cq9c.onrender.com";
 
+  // 🔄 FETCH MARKET + SHEET
   const fetchPrices = async () => {
-    const prices = await (await fetch(API_BASE + "/api/prices")).json();
-    if (Array.isArray(prices)) setData(prices);
+    try {
+      const prices = await (await fetch(API_BASE + "/api/prices")).json();
+      if (Array.isArray(prices)) setData(prices);
 
-    const sheet = await (await fetch(API_BASE + "/api/sheet")).json();
-    if (Array.isArray(sheet)) setSheetData(sheet);
+      const sheet = await (await fetch(API_BASE + "/api/sheet")).json();
+      if (Array.isArray(sheet)) setSheetData(sheet);
+    } catch {}
   };
 
+  // 🤖 AI
   const fetchAI = async () => {
-    const exp = await (await fetch(API_BASE + "/api/explain")).json();
-    setTakeaway(exp.takeaway || "");
-    setAction(exp.action || "");
-    setCommentary(exp.commentary || "");
+    try {
+      const exp = await (await fetch(API_BASE + "/api/explain")).json();
+      setTakeaway(exp.takeaway || "");
+      setAction(exp.action || "");
+      setCommentary(exp.commentary || "");
+    } catch {}
   };
 
   useEffect(() => {
@@ -34,7 +40,8 @@ function App() {
     return () => clearInterval(i);
   }, []);
 
-  const get = name =>
+  // 🔧 HELPERS
+  const get = (name) =>
     data.find(d => d.name === name)?.pctChange || 0;
 
   const usd = get("USD/CHF");
@@ -108,11 +115,50 @@ function App() {
   else if (score < -3) allocation = "10-20% Risk";
   else if (score < -1) allocation = "20-40% Risk";
 
+  const formatPrice = v => typeof v === "number" ? v.toFixed(2) : "—";
+  const formatPct = v => typeof v === "number" ? v.toFixed(2) + "%" : "—";
+
   return (
     <div style={{ maxWidth: 420, margin: "0 auto", padding: 12, background: "#020617", color: "#e2e8f0" }}>
       <h2>Macro Terminal</h2>
 
-      <button onClick={fetchAI}>Refresh AI</button>
+      {/* 📊 INDICATORS */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        {data.map((d, i) => (
+          <div key={i}>
+            <div style={{ fontSize: 20 }}>{d.name}</div>
+            <div style={{ fontSize: 28 }}>{formatPrice(d.price)}</div>
+            <div style={{
+              fontSize: 22,
+              color: d.pctChange > 0 ? "#22c55e" : "#ef4444"
+            }}>
+              {formatPct(d.pctChange)}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* 🧾 GOOGLE SHEET */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 12,
+        marginTop: 10
+      }}>
+        {sheetData.map((row, i) => {
+          const val = row.value || "";
+          return (
+            <div key={i}>
+              <div style={{ fontSize: 20 }}>{row.key}</div>
+              <div style={{ fontSize: 28 }}>{val}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      <button onClick={fetchAI} style={{ marginTop: 10 }}>
+        Refresh AI
+      </button>
 
       <div style={{ marginTop: 10 }}>
         <b>Takeaway:</b> {takeaway}<br />
@@ -120,6 +166,7 @@ function App() {
         <div>{commentary}</div>
       </div>
 
+      {/* 🔥 SIGNAL ENGINE */}
       <div style={{ marginTop: 20 }}>
         <div>REGIME: {regime}</div>
         <div>PHASE: {phase}</div>
