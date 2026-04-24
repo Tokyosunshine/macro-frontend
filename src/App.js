@@ -12,19 +12,28 @@ function App() {
 
   const API_BASE = "https://macro-backend-cq9c.onrender.com";
 
+  // 🔄 FETCH DATA (SAFE)
   const fetchData = async () => {
-    const prices = await (await fetch(`${API_BASE}/api/prices`)).json();
-    setData(prices);
+    try {
+      const pricesRes = await fetch(`${API_BASE}/api/prices`);
+      const prices = await pricesRes.json();
+      setData(Array.isArray(prices) ? prices : []);
 
-    const sheet = await (await fetch(`${API_BASE}/api/sheet`)).json();
-    setSheetData(sheet);
+      const sheetRes = await fetch(`${API_BASE}/api/sheet`);
+      const sheet = await sheetRes.json();
+      setSheetData(Array.isArray(sheet) ? sheet : []);
 
-    const exp = await (await fetch(`${API_BASE}/api/explain`)).json();
+      const expRes = await fetch(`${API_BASE}/api/explain`);
+      const exp = await expRes.json();
 
-    setTakeaway(exp.takeaway);
-    setAction(exp.action);
-    setCommentary(exp.commentary);
-    setConfidence(exp.confidence);
+      setTakeaway(exp?.takeaway || "");
+      setAction(exp?.action || "");
+      setCommentary(exp?.commentary || "");
+      setConfidence(exp?.confidence ?? null);
+
+    } catch (err) {
+      console.log("Fetch error:", err);
+    }
   };
 
   useEffect(() => {
@@ -33,6 +42,7 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // 🔥 SAFE HELPER
   const get = (name) =>
     data.find(d => d.name === name)?.pctChange || 0;
 
@@ -40,6 +50,7 @@ function App() {
   const spx = get("SPX Futures");
   const vix = get("VIX");
 
+  // 🔥 SIGNAL LOGIC
   const t = 0.3;
 
   let rawScore = 0;
@@ -60,13 +71,21 @@ function App() {
 
   const probability = Math.min(100, Math.abs(score) * 20);
 
+  // 🔧 SAFE FORMATTERS
+  const formatPrice = (v) =>
+    typeof v === "number" ? v.toFixed(2) : "—";
+
+  const formatPct = (v) =>
+    typeof v === "number" ? v.toFixed(2) + "%" : "—";
+
   return (
     <div style={{
       maxWidth: 420,
       margin: "0 auto",
       padding: 12,
       background: "#020617",
-      color: "#e2e8f0"
+      color: "#e2e8f0",
+      minHeight: "100vh"
     }}>
       <h2>Macro Terminal</h2>
 
@@ -75,31 +94,38 @@ function App() {
         {data.map((d, i) => (
           <div key={i}>
             <div style={{ fontSize: 20 }}>{d.name}</div>
-            <div style={{ fontSize: 28 }}>{d.price?.toFixed(2)}</div>
+            <div style={{ fontSize: 28 }}>{formatPrice(d.price)}</div>
             <div style={{
               fontSize: 22,
               color: d.pctChange > 0 ? "#22c55e" : "#ef4444"
             }}>
-              {d.pctChange?.toFixed(2)}%
+              {formatPct(d.pctChange)}
             </div>
           </div>
         ))}
       </div>
 
       {/* 🧾 GOOGLE SHEET */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 10 }}>
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 12,
+        marginTop: 10
+      }}>
         {sheetData.map((row, i) => (
           <div key={i}>
-            <div style={{ fontSize: 20 }}>{row.key}</div>
+            <div style={{ fontSize: 20 }}>
+              {row.key || "—"}
+            </div>
             <div style={{
               fontSize: 28,
               color:
-                row.value?.toLowerCase().includes("long") ? "#22c55e" :
-                row.value?.toLowerCase().includes("short") ? "#ef4444" :
+                row.value?.toLowerCase()?.includes("long") ? "#22c55e" :
+                row.value?.toLowerCase()?.includes("short") ? "#ef4444" :
                 row.key === "Last Update" ? "#38bdf8" :
                 "#e2e8f0"
             }}>
-              {row.value}
+              {row.value || "—"}
             </div>
           </div>
         ))}
@@ -116,16 +142,16 @@ function App() {
       {/* 🤖 AI */}
       <div style={{ marginTop: 10 }}>
         <div>TAKEAWAY</div>
-        <div>{takeaway}</div>
+        <div>{takeaway || "—"}</div>
       </div>
 
       <div>
         <div>ACTION</div>
-        <div>{action}</div>
+        <div>{action || "—"}</div>
       </div>
 
       <div style={{ marginTop: 10 }}>
-        <div>{commentary}</div>
+        <div>{commentary || "—"}</div>
       </div>
 
       {/* 📊 BOTTOM INDICATORS */}
@@ -141,19 +167,13 @@ function App() {
         }}>
           {data.map((d, i) => (
             <div key={"bottom-" + i}>
-              <div style={{ fontSize: 16 }}>
-                {d.name}
-              </div>
-
-              <div style={{ fontSize: 22 }}>
-                {d.price ? d.price.toFixed(2) : "—"}
-              </div>
-
+              <div style={{ fontSize: 16 }}>{d.name}</div>
+              <div style={{ fontSize: 22 }}>{formatPrice(d.price)}</div>
               <div style={{
                 fontSize: 18,
                 color: d.pctChange > 0 ? "#22c55e" : "#ef4444"
               }}>
-                {d.pctChange ? d.pctChange.toFixed(2) + "%" : "—"}
+                {formatPct(d.pctChange)}
               </div>
             </div>
           ))}
