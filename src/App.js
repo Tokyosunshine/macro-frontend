@@ -14,7 +14,7 @@ function App() {
 
   const API_BASE = "https://macro-backend-cq9c.onrender.com";
 
-  // 🔄 FETCH
+  // 🔄 FETCH ALL DATA
   const fetchAll = async () => {
     try {
       const prices = await (await fetch(API_BASE + "/api/prices")).json();
@@ -24,16 +24,21 @@ function App() {
       setData(prices || []);
       setSheetData(sheet || []);
       setBacktest(bt || {});
-    } catch {}
+    } catch (e) {
+      console.error("Fetch error:", e);
+    }
   };
 
+  // 🤖 AI FETCH
   const fetchAI = async () => {
     try {
       const exp = await (await fetch(API_BASE + "/api/explain")).json();
       setTakeaway(exp.takeaway || "");
       setAction(exp.action || "");
       setCommentary(exp.commentary || "");
-    } catch {}
+    } catch (e) {
+      console.error("AI error:", e);
+    }
   };
 
   useEffect(() => {
@@ -43,7 +48,7 @@ function App() {
   }, []);
 
   // 🔧 HELPERS
-  const get = name =>
+  const get = (name) =>
     data.find(d => d.name === name)?.pctChange || 0;
 
   const usd = get("USD/CHF");
@@ -57,6 +62,7 @@ function App() {
 
   const t = 0.3;
 
+  // 🔥 FACTORS
   const factors = [
     { name: "USD", val: usd, score: usd > t ? -1.5 : usd < -t ? 1.5 : 0 },
     { name: "SPX", val: spx, score: spx > t ? 2 : spx < -t ? -2 : 0 },
@@ -70,24 +76,29 @@ function App() {
 
   let rawScore = factors.reduce((s, f) => s + f.score, 0);
 
+  // 🔄 SMOOTHING
   const alpha = 0.3;
   smoothedScoreRef.current =
     alpha * rawScore + (1 - alpha) * smoothedScoreRef.current;
 
   const score = smoothedScoreRef.current;
 
+  // 📊 PROBABILITY
   const probability = 100 / (1 + Math.exp(-score));
 
+  // 🧠 REGIME
   const regime =
     score > 3 ? "RISK ON" :
     score < -3 ? "RISK OFF" :
     "NEUTRAL";
 
+  // 🧠 PHASE
   let phase = "TRANSITION";
   if (score > 2 && spx > 0 && vix < 0) phase = "EXPANSION";
   if (score < -2 && spx < 0 && vix > 0) phase = "CONTRACTION";
   if (Math.abs(score) < 1) phase = "LATE CYCLE";
 
+  // 🧠 PERSISTENCE
   if (Math.abs(score) > 2) persistenceRef.current++;
   else persistenceRef.current = 0;
 
@@ -96,10 +107,12 @@ function App() {
     persistenceRef.current > 2 ? "TREND BUILDING" :
     "NO TREND";
 
+  // ⚠️ WARNING
   let warning = "NONE";
   if (score > 2 && vix > 0.5) warning = "RISK BUILDING";
   if (score < -2 && spx > 0.5) warning = "SHORT SQUEEZE RISK";
 
+  // 🔥 DRIVERS
   const topDrivers = factors
     .filter(f => Math.abs(f.score) > 0)
     .sort((a, b) => Math.abs(b.score) - Math.abs(a.score))
@@ -107,30 +120,47 @@ function App() {
     .map(f => f.name + (f.val > t ? "↑" : f.val < -t ? "↓" : ""))
     .join(" ");
 
+  // 🎯 SUGGESTION
   let suggestion = "HOLD";
   if (score > 3 && probability > 70) suggestion = "ADD RISK";
   if (score < -3 && probability > 70) suggestion = "REDUCE RISK";
 
+  // 💼 ALLOCATION
   let allocation = "50/50";
-  if (score > 3) allocation = "80-90% Risk";
-  else if (score > 1) allocation = "60-70% Risk";
-  else if (score < -3) allocation = "10-20% Risk";
-  else if (score < -1) allocation = "20-40% Risk";
+  if (score > 3) allocation = "80–90% Risk";
+  else if (score > 1) allocation = "60–70% Risk";
+  else if (score < -3) allocation = "10–20% Risk";
+  else if (score < -1) allocation = "20–40% Risk";
 
   const formatPrice = v => typeof v === "number" ? v.toFixed(2) : "—";
   const formatPct = v => typeof v === "number" ? v.toFixed(2) + "%" : "—";
 
   return (
-    <div style={{ maxWidth: 420, margin: "0 auto", padding: 12 }}>
+    <div style={{
+      maxWidth: 420,
+      margin: "0 auto",
+      padding: 12,
+      background: "#020617",
+      color: "#e2e8f0",
+      minHeight: "100vh"
+    }}>
+
       <h2>Macro Terminal</h2>
 
       {/* 📊 INDICATORS */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 12
+      }}>
         {data.map((d, i) => (
           <div key={i}>
-            <div>{d.name}</div>
-            <div style={{ fontSize: 22 }}>{formatPrice(d.price)}</div>
-            <div style={{ color: d.pctChange > 0 ? "green" : "red" }}>
+            <div style={{ fontSize: 20 }}>{d.name}</div>
+            <div style={{ fontSize: 28 }}>{formatPrice(d.price)}</div>
+            <div style={{
+              fontSize: 22,
+              color: d.pctChange > 0 ? "#22c55e" : "#ef4444"
+            }}>
               {formatPct(d.pctChange)}
             </div>
           </div>
@@ -138,22 +168,41 @@ function App() {
       </div>
 
       {/* 🧾 GOOGLE SHEET */}
-      <div style={{ marginTop: 10 }}>
-        {sheetData.map((row, i) => (
-          <div key={i}>
-            <b>{row.key}:</b> {row.value}
-          </div>
-        ))}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 12,
+        marginTop: 12
+      }}>
+        {sheetData.map((row, i) => {
+          const val = row.value || "";
+          return (
+            <div key={i}>
+              <div style={{ fontSize: 20 }}>{row.key}</div>
+              <div style={{ fontSize: 28 }}>{val}</div>
+            </div>
+          );
+        })}
       </div>
 
       {/* 🤖 AI */}
-      <button onClick={fetchAI} style={{ marginTop: 10 }}>
+      <button
+        onClick={fetchAI}
+        style={{
+          marginTop: 12,
+          padding: 8,
+          background: "#38bdf8",
+          color: "black",
+          border: "none",
+          cursor: "pointer"
+        }}
+      >
         Refresh AI
       </button>
 
-      <div>
-        <b>Takeaway:</b> {takeaway}<br />
-        <b>Action:</b> {action}
+      <div style={{ marginTop: 10 }}>
+        <div><b>Takeaway:</b> {takeaway}</div>
+        <div><b>Action:</b> {action}</div>
         <div>{commentary}</div>
       </div>
 
@@ -172,11 +221,12 @@ function App() {
 
       {/* 📊 BACKTEST */}
       <div style={{ marginTop: 20 }}>
-        <h3>Backtest (6M)</h3>
+        <div style={{ color: "#38bdf8" }}>BACKTEST (6M)</div>
         <div>Total Return: {backtest.totalReturn}</div>
         <div>Hit Rate: {backtest.hitRate}</div>
         <div>Max Drawdown: {backtest.maxDrawdown}</div>
       </div>
+
     </div>
   );
 }
