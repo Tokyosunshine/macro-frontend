@@ -14,22 +14,30 @@ function App() {
 
   const API_BASE = "https://macro-backend-cq9c.onrender.com";
 
-  // 🔄 FETCH ALL DATA
-  const fetchAll = async () => {
+  // 🔄 INDICATORS + BACKTEST
+  const fetchIndicators = async () => {
     try {
       const prices = await (await fetch(API_BASE + "/api/prices")).json();
-      const sheet = await (await fetch(API_BASE + "/api/sheet")).json();
       const bt = await (await fetch(API_BASE + "/api/backtest")).json();
 
       setData(prices || []);
-      setSheetData(sheet || []);
       setBacktest(bt || {});
     } catch (e) {
-      console.error("Fetch error:", e);
+      console.error("Indicator fetch error:", e);
     }
   };
 
-  // 🤖 AI FETCH
+  // 🧾 PORTFOLIO (GOOGLE SHEET)
+  const fetchPortfolio = async () => {
+    try {
+      const sheet = await (await fetch(API_BASE + "/api/sheet")).json();
+      setSheetData(sheet || []);
+    } catch (e) {
+      console.error("Sheet fetch error:", e);
+    }
+  };
+
+  // 🤖 AI
   const fetchAI = async () => {
     try {
       const exp = await (await fetch(API_BASE + "/api/explain")).json();
@@ -41,9 +49,16 @@ function App() {
     }
   };
 
+  // 🔄 AUTO REFRESH
   useEffect(() => {
-    fetchAll();
-    const i = setInterval(fetchAll, 60000);
+    fetchIndicators();
+    fetchPortfolio();
+
+    const i = setInterval(() => {
+      fetchIndicators();
+      fetchPortfolio();
+    }, 60000);
+
     return () => clearInterval(i);
   }, []);
 
@@ -62,7 +77,6 @@ function App() {
 
   const t = 0.3;
 
-  // 🔥 FACTORS
   const factors = [
     { name: "USD", val: usd, score: usd > t ? -1.5 : usd < -t ? 1.5 : 0 },
     { name: "SPX", val: spx, score: spx > t ? 2 : spx < -t ? -2 : 0 },
@@ -76,29 +90,24 @@ function App() {
 
   let rawScore = factors.reduce((s, f) => s + f.score, 0);
 
-  // 🔄 SMOOTHING
   const alpha = 0.3;
   smoothedScoreRef.current =
     alpha * rawScore + (1 - alpha) * smoothedScoreRef.current;
 
   const score = smoothedScoreRef.current;
 
-  // 📊 PROBABILITY
   const probability = 100 / (1 + Math.exp(-score));
 
-  // 🧠 REGIME
   const regime =
     score > 3 ? "RISK ON" :
     score < -3 ? "RISK OFF" :
     "NEUTRAL";
 
-  // 🧠 PHASE
   let phase = "TRANSITION";
   if (score > 2 && spx > 0 && vix < 0) phase = "EXPANSION";
   if (score < -2 && spx < 0 && vix > 0) phase = "CONTRACTION";
   if (Math.abs(score) < 1) phase = "LATE CYCLE";
 
-  // 🧠 PERSISTENCE
   if (Math.abs(score) > 2) persistenceRef.current++;
   else persistenceRef.current = 0;
 
@@ -107,12 +116,10 @@ function App() {
     persistenceRef.current > 2 ? "TREND BUILDING" :
     "NO TREND";
 
-  // ⚠️ WARNING
   let warning = "NONE";
   if (score > 2 && vix > 0.5) warning = "RISK BUILDING";
   if (score < -2 && spx > 0.5) warning = "SHORT SQUEEZE RISK";
 
-  // 🔥 DRIVERS
   const topDrivers = factors
     .filter(f => Math.abs(f.score) > 0)
     .sort((a, b) => Math.abs(b.score) - Math.abs(a.score))
@@ -120,12 +127,10 @@ function App() {
     .map(f => f.name + (f.val > t ? "↑" : f.val < -t ? "↓" : ""))
     .join(" ");
 
-  // 🎯 SUGGESTION
   let suggestion = "HOLD";
   if (score > 3 && probability > 70) suggestion = "ADD RISK";
   if (score < -3 && probability > 70) suggestion = "REDUCE RISK";
 
-  // 💼 ALLOCATION
   let allocation = "50/50";
   if (score > 3) allocation = "80–90% Risk";
   else if (score > 1) allocation = "60–70% Risk";
@@ -147,12 +152,15 @@ function App() {
 
       <h2>Macro Terminal</h2>
 
+      {/* 🔄 BUTTONS */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+        <button onClick={fetchIndicators}>Refresh Indicators</button>
+        <button onClick={fetchPortfolio}>Refresh Portfolio</button>
+        <button onClick={fetchAI}>Refresh AI</button>
+      </div>
+
       {/* 📊 INDICATORS */}
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "1fr 1fr",
-        gap: 12
-      }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         {data.map((d, i) => (
           <div key={i}>
             <div style={{ fontSize: 20 }}>{d.name}</div>
@@ -167,39 +175,16 @@ function App() {
         ))}
       </div>
 
-      {/* 🧾 GOOGLE SHEET */}
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "1fr 1fr",
-        gap: 12,
-        marginTop: 12
-      }}>
-        {sheetData.map((row, i) => {
-          const val = row.value || "";
-          return (
-            <div key={i}>
-              <div style={{ fontSize: 20 }}>{row.key}</div>
-              <div style={{ fontSize: 28 }}>{val}</div>
-            </div>
-          );
-        })}
+      {/* 🧾 PORTFOLIO */}
+      <div style={{ marginTop: 12 }}>
+        {sheetData.map((row, i) => (
+          <div key={i}>
+            <b>{row.key}:</b> {row.value}
+          </div>
+        ))}
       </div>
 
       {/* 🤖 AI */}
-      <button
-        onClick={fetchAI}
-        style={{
-          marginTop: 12,
-          padding: 8,
-          background: "#38bdf8",
-          color: "black",
-          border: "none",
-          cursor: "pointer"
-        }}
-      >
-        Refresh AI
-      </button>
-
       <div style={{ marginTop: 10 }}>
         <div><b>Takeaway:</b> {takeaway}</div>
         <div><b>Action:</b> {action}</div>
